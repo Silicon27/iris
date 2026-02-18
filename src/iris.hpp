@@ -4,6 +4,8 @@
  *
  * A C++20 compile time support library with each element designed to aid compile time resolution
  */
+#ifndef IRIS_HPP
+#define IRIS_HPP
 
 #include <type_traits>
 #include <tuple>
@@ -80,3 +82,6 @@ namespace iris {
   // pack recursion, pack conversion, pack op, etc
 
 }
+
+
+#endif // IRIS_HPP
