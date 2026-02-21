@@ -77,9 +77,22 @@ namespace iris {
   }
 }
 
-namespace iris {
-  // section made explicitly for template packs
-  // pack recursion, pack conversion, pack op, etc
+namespace iris::pgen {
+  // iris::pgen - iris parser generator 
+
+  /// central traits struct for token type enumators, given that `T` is an enum and `N` is an enumerator of `T`, `token_entor_traits<T, N>` will be well formed and provide the following members:
+  /// - type: the enum `T`
+  /// - entor_n: the enumerator `N` as a value of type `std::size_t`
+  /// - value: the value `N` as a value of type `T`
+  template <typename T, std::size_t N>
+  requires std::is_enum_v<T>
+  struct token_entor_traits {
+    using type = T;
+    using reference_type = T&;
+    using pointer_type = T*;
+    constexpr static std::size_t entor_n = N;
+    constexpr static T value = static_cast<T>(N);
+  };
 
 }
 
