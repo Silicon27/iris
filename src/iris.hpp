@@ -80,19 +80,109 @@ namespace iris {
 namespace iris::pgen {
   // iris::pgen - iris parser generator 
 
-  /// central traits struct for token type enumators, given that `T` is an enum and `N` is an enumerator of `T`, `token_entor_traits<T, N>` will be well formed and provide the following members:
-  /// - type: the enum `T`
-  /// - entor_n: the enumerator `N` as a value of type `std::size_t`
-  /// - value: the value `N` as a value of type `T`
-  template <typename T, std::size_t N>
-  requires std::is_enum_v<T>
-  struct token_entor_traits {
-    using type = T;
-    using reference_type = T&;
-    using pointer_type = T*;
-    constexpr static std::size_t entor_n = N;
-    constexpr static T value = static_cast<T>(N);
-  };
+  template <char... Cs>
+    consteval auto has_trailing_null() {
+        if constexpr (sizeof...(Cs) == 0) {
+            return false;
+        } else {
+            return pack_at<sizeof...(Cs) - 1, Cs...>() == '\0';
+        }
+    }
+
+    template <char... Cs>
+    struct string {
+        static constexpr char value[sizeof...(Cs)] = {Cs...};
+        static consteval size_t max_idx() {return sizeof...(Cs) - 1;}
+        static consteval size_t length() {return sizeof...(Cs);}
+        static consteval const char* begin() {return value;}
+        static consteval const char* end() {return value + sizeof...(Cs);}
+    };
+
+    template <char...>
+    struct remove_trailing_null_recursive;
+
+    template <>
+    struct remove_trailing_null_recursive<> {
+        using type = string<>;
+    };
+
+    template <char Last>
+    struct remove_trailing_null_recursive<Last> {
+        using type = std::conditional_t<Last == '\0', string<>, string<Last>>;
+    };
+
+    template <char First, char... Rest>
+    struct remove_trailing_null_recursive<First, Rest...> {
+    private:
+        using tail = typename remove_trailing_null_recursive<Rest...>::type;
+    public:
+        using type = decltype([]<char... Cs2>(string<Cs2...>) -> string<First, Cs2...> { return {}; }(tail{}));
+    };
+
+    template <char... Cs>
+    consteval auto remove_trailing_null() {
+        if constexpr (sizeof...(Cs) == 0) {
+            return string<>{};
+        } else {
+            constexpr char arr[] = {Cs...};
+            if constexpr (arr[sizeof...(Cs) - 1] == '\0') {
+                return []<std::size_t... Is>(std::index_sequence<Is...>) {
+                    return string<arr[Is]...>{};
+                }(std::make_index_sequence<sizeof...(Cs) - 1>{});
+            } else {
+                return string<Cs...>{};
+            }
+        }
+    }
+
+    template <char... Cs>
+    using remove_trailing_null_t = decltype(remove_trailing_null<Cs...>());
+
+    template <typename Str1, typename Str2>
+    struct append;
+
+    template <char... Cs1, char... Cs2>
+    struct append<string<Cs1...>, string<Cs2...>> {
+        using str1 = remove_trailing_null_t<Cs1...>;
+        using str2 = remove_trailing_null_t<Cs2...>;
+
+        using type = decltype(
+            []<char... C1, char... C2>(string<C1...>, string<C2...>) -> string<C1..., C2...>
+            {return {};} (str1{}, str2{})
+        );
+    };
+
+    template <typename Str1, typename Str2>
+    using append_t = typename append<Str1, Str2>::type;
+
+    template <typename Str1, typename Str2>
+    struct append_as_literal;
+
+    template <char... Cs1, char... Cs2>
+    struct append_as_literal<string<Cs1...>, string<Cs2...>> {
+        using str1 = remove_trailing_null_t<Cs1...>;
+        using str2 = remove_trailing_null_t<Cs2...>;
+
+        using type = decltype([]<char... C1, char... C2>(string<C1...>, string<C2...>) -> append_t<string<C1..., C2...>, string<'\0'>>
+            {return {};} (str1{}, str2{}));
+    };
+
+    template <auto& Str, std::size_t N, std::size_t... Is>
+    consteval auto make_string_literal_helper(std::index_sequence<Is...>) {
+        if constexpr (has_trailing_null<Str[Is]...>()) {
+            return string<Str[Is]...>{};
+        } else  {
+            return string<Str[Is]..., '\0'>{};
+        }
+    }
+
+    template <auto& Str, std::size_t N>
+    struct make_string_literal {
+        using type = decltype(make_string_literal_helper<Str, N>(std::make_index_sequence<N>{}));
+    };
+
+    template <auto& Str, std::size_t N>
+    using make_string_literal_t = typename make_string_literal<Str, N>::type;
 
 }
 
