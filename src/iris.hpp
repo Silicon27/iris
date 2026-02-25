@@ -7,6 +7,7 @@
 #ifndef IRIS_HPP
 #define IRIS_HPP
 
+#include <cstddef>
 #include <type_traits>
 #include <tuple>
 
@@ -183,6 +184,50 @@ namespace iris::pgen {
 
     template <auto& Str, std::size_t N>
     using make_string_literal_t = typename make_string_literal<Str, N>::type;
+
+    struct input {
+        const char* data;
+        std::size_t pos;
+        std::size_t size;
+
+        bool eof() const {
+            return pos >= size;
+        }
+
+        char peek() const {
+            return eof() ? '\0' : data[pos];
+        }
+
+        void advance() {
+            if (!eof()) {
+                ++pos;
+            }
+        }
+    };
+
+    template <typename... Rules>
+    struct seq;
+
+    template <typename First, typename... Rest>
+    struct seq<First, Rest...> {
+        static bool match(input& in) {
+            auto save = in;
+            if (!First::match(in)) {
+                in = save;
+                return false;
+            }
+
+            if constexpr (sizeof...(Rest) == 0) {
+                return true;
+            } else {
+                if (!seq<Rest...>::match(in)) {
+                    in = save;
+                    return false;
+                }
+                return true;
+            }
+        }
+    };
 
 }
 
